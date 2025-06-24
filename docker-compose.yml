@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # Main application
+  accomopricer:
+    build: .
+    container_name: accomopricer-app
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/
+      - MONGODB_DATABASE=accomopricer
+      - MONGODB_COLLECTION=crawled_prices
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_PASSWORD=
+      - CACHE_TTL=3600
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - DEBUG=false
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - accomopricer-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MongoDB service
+  mongodb:
+    image: mongo:7.0
+    container_name: accomopricer-mongodb
+    environment:
+      - MONGO_INITDB_DATABASE=accomopricer
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    ports:
+      - "27017:27017"
+    networks:
+      - accomopricer-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis service
+  redis:
+    image: redis:7.2-alpine
+    container_name: accomopricer-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - accomopricer-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: MongoDB Express (web-based admin interface)
+  mongo-express:
+    image: mongo-express:1.0.0
+    container_name: accomopricer-mongo-express
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=admin123
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongodb
+    networks:
+      - accomopricer-network
+    restart: unless-stopped
+    profiles:
+      - dev
+
+  # Optional: Redis Commander (web-based Redis admin interface)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: accomopricer-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8082:8081"
+    depends_on:
+      - redis
+    networks:
+      - accomopricer-network
+    restart: unless-stopped
+    profiles:
+      - dev
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  accomopricer-network:
+    driver: bridge 

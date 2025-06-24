@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # Development overrides for main application
+  accomopricer:
+    environment:
+      - DEBUG=true
+      - CACHE_TTL=1800  # 30 minutes for development
+    volumes:
+      - .:/app
+    command: python main.py
+    profiles:
+      - dev
+
+  # Development overrides for MongoDB
+  mongodb:
+    ports:
+      - "27017:27017"
+    profiles:
+      - dev
+
+  # Development overrides for Redis
+  redis:
+    ports:
+      - "6379:6379"
+    profiles:
+      - dev 
